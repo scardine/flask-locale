@@ -27,8 +27,5 @@ setup(
         'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
-    tests_require=[
-        'nose>=1.0'
-    ],
-    test_suite='nose.collector'
+    test_suite='tests.suite'
 )
