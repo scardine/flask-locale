@@ -4,7 +4,7 @@ Flask-Locale
 ----
 
 
-Modified from Tornado.Locale and Flask-Babel
+Some code is from Tornado.Locale
 """
 
 import os

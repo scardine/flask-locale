@@ -1,6 +1,3 @@
-"""
-Flask-Locale
-"""
 from setuptools import setup
 
 setup(
@@ -11,7 +8,7 @@ setup(
     author='whtsky',
     author_email='whtsky@me.com',
     description='',
-    long_description=__doc__,
+    long_description=open('README.rst', 'r').read(),
     py_modules=['flask_locale'],
     zip_safe=False,
     platforms='any',
