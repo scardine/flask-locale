@@ -10,10 +10,10 @@ Modified from Tornado.Locale and Flask-Babel
 import os
 import re
 import csv
-from flask import _request_ctx_stack
+from flask import _request_ctx_stack, request
 
 
-__all__ = ('Locale', 'refresh', 'translate')
+__all__ = ('Locale', 'refresh', 'translate', 'to_unicode')
 
 
 def get_app():
@@ -35,66 +35,6 @@ def to_unicode(value):
     return value.decode("utf-8")
 
 
-def load_translations(directory):
-    u"""Loads translations from CSV files in a directory.
-
-    Translations are strings with optional Python-style named placeholders
-    (e.g., "My name is %(name)s") and their associated translations.
-
-    The directory should have translation files of the form LOCALE.csv,
-    e.g. es_GT.csv. The CSV files should have two or three columns: string,
-    translation, and an optional plural indicator. Plural indicators should
-    be one of "plural" or "singular". A given string can have both singular
-    and plural forms. For example "%(name)s liked this" may have a
-    different verb conjugation depending on whether %(name)s is one
-    name or a list of names. There should be two rows in the CSV file for
-    that string, one with plural indicator "singular", and one "plural".
-    For strings with no verbs that would change on translation, simply
-    use "unknown" or the empty string (or don't include the column at all).
-
-    The file is read using the csv module in the default "excel" dialect.
-    In this format there should not be spaces after the commas.
-
-    Example translation es_LA.csv:
-
-        "I love you","Te amo"
-        "%(name)s liked this","A %(name)s les gust\u00f3 esto","plural"
-        "%(name)s liked this","A %(name)s le gust\u00f3 esto","singular"
-    """
-    _translations = {}
-    for path in os.listdir(directory):
-        if not path.endswith(".csv"):
-            continue
-        locale, extension = path.split(".")
-        if not re.match("[a-z]+(_[A-Z]+)?$", locale):
-            continue
-        full_path = os.path.join(directory, path)
-        try:
-            # python 3: csv.reader requires a file open in text mode.
-            # Force utf8 to avoid dependence on $LANG environment variable.
-            f = open(full_path, "r", encoding="utf-8")
-        except TypeError:
-            # python 2: files return byte strings, which are decoded below.
-            # Once we drop python 2.5, this could use io.open instead
-            # on both 2 and 3.
-            f = open(full_path, "r")
-        _translations[locale] = {}
-        for row in csv.reader(f):
-            if not row or len(row) < 2:
-                continue
-            row = [to_unicode(c).strip() for c in row]
-            english, translation = row[:2]
-            if len(row) > 2:
-                plural = row[2] or "unknown"
-            else:
-                plural = "unknown"
-            if plural not in ("plural", "singular", "unknown"):
-                continue
-            _translations[locale].setdefault(plural, {})[english] = translation
-        f.close()
-    return _translations
-
-
 class Locale(object):
     """Central controller class that can be used to configure how
     Flask-Locale behaves.  Each application that wants to use Flask-Locale
@@ -105,6 +45,8 @@ class Locale(object):
     def __init__(self, app=None, default_locale='en', configure_jinja=True):
         self._default_locale = default_locale
         self._configure_jinja = configure_jinja
+        self._supported_locales = frozenset(default_locale)
+        self._translations = None
 
         if app:
             self.init_app(app)
@@ -130,6 +72,74 @@ class Locale(object):
                 newstyle=True
             )
 
+    def load_translations(self, directory):
+        u"""Loads translations from CSV files in a directory.
+
+        Translations are strings with optional Python-style named placeholders
+        (e.g., "My name is %(name)s") and their associated translations.
+
+        The directory should have translation files of the form LOCALE.csv,
+        e.g. es_GT.csv. The CSV files should have two or three columns: string,
+        translation, and an optional plural indicator. Plural indicators should
+        be one of "plural" or "singular". A given string can have both singular
+        and plural forms. For example "%(name)s liked this" may have a
+        different verb conjugation depending on whether %(name)s is one
+        name or a list of names. There should be two rows in the CSV file for
+        that string, one with plural indicator "singular", and one "plural".
+        For strings with no verbs that would change on translation, simply
+        use "unknown" or the empty string (or don't include the column at all).
+
+        The file is read using the csv module in the default "excel" dialect.
+        In this format there should not be spaces after the commas.
+
+        Example translation es_LA.csv:
+
+            "I love you","Te amo"
+            "%(name)s liked this","A %(name)s les gust\u00f3 esto","plural"
+            "%(name)s liked this","A %(name)s le gust\u00f3 esto","singular"
+        """
+        app = get_app()
+        logger = app.logger
+        _translations = {}
+        for path in os.listdir(directory):
+            if not path.endswith(".csv"):
+                continue
+            locale, extension = path.split(".")
+            if not re.match("[a-z]+(_[A-Z]+)?$", locale):
+                logger.error("Unrecognized locale %r (path: %s)", locale,
+                    os.path.join(directory, path))
+                continue
+            full_path = os.path.join(directory, path)
+            try:
+                # python 3: csv.reader requires a file open in text mode.
+                # Force utf8 to avoid dependence on $LANG environment variable.
+                f = open(full_path, "r", encoding="utf-8")
+            except TypeError:
+                # python 2: files return byte strings, which are decoded below.
+                # Once we drop python 2.5, this could use io.open instead
+                # on both 2 and 3.
+                f = open(full_path, "r")
+            _translations[locale] = {}
+            for i, row in enumerate(csv.reader(f)):
+                if not row or len(row) < 2:
+                    continue
+                row = [to_unicode(c).strip() for c in row]
+                english, translation = row[:2]
+                if len(row) > 2:
+                    plural = row[2] or "unknown"
+                else:
+                    plural = "unknown"
+                if plural not in ("plural", "singular", "unknown"):
+                    logger.error("Unrecognized plural indicator %r in %s line %d",
+                        plural, path, i + 1)
+                    continue
+                _translations[locale].setdefault(plural, {})[english] = translation
+            f.close()
+        _supported_locales = frozenset(_translations.keys())
+        self._supported_locales = _supported_locales
+        self._translations = _translations
+        logger.debug("Supported locales: %s", sorted(_supported_locales))
+
     def localeselector(self, f):
         """Registers a callback function for locale selection.  The default
         behaves as if a function was registered that returns `None` all the
@@ -143,44 +153,82 @@ class Locale(object):
         self.locale_selector_func = f
         return f
 
+    def get_browser_locale(self):
+        """Determines the user's locale from Accept-Language header.
 
-def get_translations():
+        See http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.4
+        """
+        if "Accept-Language" in request.headers:
+            languages = request.headers["Accept-Language"].split(",")
+            locales = []
+            for language in languages:
+                parts = language.strip().split(";")
+                if len(parts) > 1 and parts[1].startswith("q="):
+                    try:
+                        score = float(parts[1][2:])
+                    except (ValueError, TypeError):
+                        score = 0.0
+                else:
+                    score = 1.0
+                locales.append((parts[0], score))
+            if locales:
+                locales.sort(key=lambda (l, s): s, reverse=True)
+                codes = [l[0] for l in locales]
+                return self.get_closest(*codes)
+        app = get_app()
+        return self.get_closest(app.config['DEFAULT_LOCALE'])
+
+    def get_closest(self, *locale_codes):
+        """Returns the closest match for the given locale code."""
+        app = get_app()
+        if self._translations is None:
+            self.load_translations(app.config['LOCALE_PATH'])
+
+        for code in locale_codes:
+            if not code:
+                continue
+            code = code.replace("-", "_")
+            parts = code.split("_")
+            if len(parts) > 2:
+                continue
+            if code in self._supported_locales:
+                return self.get(code)
+            if parts[0].lower() in self._supported_locales:
+                return self.get(parts[0].lower())
+        return self.get(app.config['DEFAULT_LOCALE'])
+
+    def get(self, code):
+        """Returns the translate dict for the given locale code.
+
+        If it is not supported, we raise an exception.
+        """
+        return self._translations.get(code, {})
+
+
+def get_translation():
     """Returns the correct gettext translations that should be used for
     this request.  This will never fail and return a dummy translation
     object if used outside of the request or if a translation cannot be
     found.
     """
     app = get_app()
-    translations = getattr(app, 'locale_translations', None)
-    if not translations:
-        dirname = app.config['LOCALE_PATH']
-        translations = load_translations(dirname)
-        app.locale_translations = translations
-    return translations
-
-
-def get_locale():
-    """Returns the locale that should be used for this request as
-    `locale.Locale` object.  This returns `None` if used outside of
-    a request.
-    """
-    app = get_app()
-    locale = getattr(app, 'current_locale', None)
-    if not locale:
-        locale_instance = app.extensions['locale']
-        locale = app.config['DEFAULT_LOCALE']
-        if hasattr(locale_instance, 'locale_selector_func'):
-            rv = locale.locale_selector_func()
-            if rv:
-                locale = rv
-        app.current_locale = locale
+    if not app:
+        return None
+    locale_instance = app.extensions['locale']
+    locale = None
+    if hasattr(locale_instance, 'locale_selector_func'):
+        rv = locale_instance.locale_selector_func()
+        if rv:
+            locale = locale_instance.get_closest(rv)
+    if locale is None:
+        locale = locale_instance.get_browser_locale()
     return locale
 
 
 def refresh():
-    """Refreshes the cached timezones and locale information.  This can
-    be used to switch a translation between a request and if you want
-    the changes to take place immediately, not just with the next request::
+    """Refreshes the cached locale information.  This can be used to switch
+    a translation between a request and if you want the changes to take place
+    immediately, not just with the next request::
 
         user.locale = request.form['locale']
         refresh()
@@ -189,28 +237,21 @@ def refresh():
     Without that refresh, the :func:`~flask.flash` function would probably
     return English text and a now German page.
     """
-    ctx = _request_ctx_stack.top
-    if not ctx:
+    app = get_app()
+    if not app:
         return None
-    if hasattr(ctx, 'current_locale'):
-        delattr(ctx, 'current_locale')
-
-    app = ctx.app
-    if hasattr(app, 'locale_translations'):
-        delattr(app, 'locale_translations')
+    app.extensions['locale']._translations = None
 
 
 def translate(message, plural_message=None, count=None):
-    translations = get_translations()
-    current_locale = get_locale()
-    translation_locale = translations[current_locale]
+    translation = get_translation()
     if plural_message:
         assert count
         if count != 1:
             message = plural_message
-            message_dict = translation_locale.get("plural", {})
+            message_dict = translation.get("plural", {})
         else:
-            message_dict = translation_locale.get("singular", {})
+            message_dict = translation.get("singular", {})
     else:
-        message_dict = translation_locale.get("unknown", {})
+        message_dict = translation.get("unknown", {})
     return message_dict.get(message, message)
