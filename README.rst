@@ -2,7 +2,8 @@
 Flask-Locale
 ==============
 
-Implements i18n and l10n support for Flask.It is inspired by 
+Flask-Locale is an extension to `Flask`_ that adds i18n and l10n support to
+any Flask application.It is inspired by 
 `Tornado.Locale <https://github.com/facebook/tornado/blob/master/tornado/locale.py>`_
 
 License

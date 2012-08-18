@@ -7,13 +7,14 @@ setup(
     license='MIT',
     author='whtsky',
     author_email='whtsky@me.com',
-    description='',
+    description='i18n and l10n support for Flask',
     long_description=open('README.rst', 'r').read(),
     py_modules=['flask_locale'],
     zip_safe=False,
     platforms='any',
     install_requires=[
-        'Flask',
+        'Flask>=0.7',
+        'Jinja2>=2.5',
     ],
     classifiers=[
         'Environment :: Web Environment',

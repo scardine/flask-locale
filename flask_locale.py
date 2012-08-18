@@ -76,26 +76,28 @@ class Locale(object):
         u"""Loads translations from CSV files in a directory.
 
         Translations are strings with optional Python-style named placeholders
-        (e.g., "My name is %(name)s") and their associated translations.
+        (e.g., ``"My name is %(name)s"``) and their associated translations.
 
         The directory should have translation files of the form LOCALE.csv,
         e.g. es_GT.csv. The CSV files should have two or three columns: string,
         translation, and an optional plural indicator. Plural indicators should
-        be one of "plural" or "singular". A given string can have both singular
-        and plural forms. For example "%(name)s liked this" may have a
+        be one of ``"plural"`` or ``"singular"``. A given string can have both singular
+        and plural forms. For example ``"%(name)s liked this"`` may have a
         different verb conjugation depending on whether %(name)s is one
         name or a list of names. There should be two rows in the CSV file for
         that string, one with plural indicator "singular", and one "plural".
         For strings with no verbs that would change on translation, simply
-        use "unknown" or the empty string (or don't include the column at all).
+        use ``"unknown"`` or the empty string (or don't include the column at all).
 
         The file is read using the csv module in the default "excel" dialect.
         In this format there should not be spaces after the commas.
 
-        Example translation es_LA.csv:
+        Example translation es_LA.csv::
 
             "I love you","Te amo"
+            
             "%(name)s liked this","A %(name)s les gust\u00f3 esto","plural"
+            
             "%(name)s liked this","A %(name)s le gust\u00f3 esto","singular"
         """
         app = get_app()
@@ -146,7 +148,7 @@ class Locale(object):
         time.  If `None` is returned, the locale falls back to the one from
         the configuration.
 
-        This has to return the locale as string (eg: ``'de_AT'``, ''`en_US`'')
+        This has to return the locale as string (eg: ``'de_AT'``, ``'en_US'``)
         """
         assert not hasattr(self, 'locale_selector_func'), \
             'a localeselector function is already registered'
@@ -198,10 +200,7 @@ class Locale(object):
         return self.get(app.config['DEFAULT_LOCALE'])
 
     def get(self, code):
-        """Returns the translate dict for the given locale code.
-
-        If it is not supported, we raise an exception.
-        """
+        """Returns the translate dict for the given locale code."""
         return self._translations.get(code, {})
 
 
@@ -244,6 +243,12 @@ def refresh():
 
 
 def translate(message, plural_message=None, count=None):
+    """Returns the translation for the given message for this locale.
+    
+    If plural_message is given, you must also provide count. We return
+    plural_message when count != 1, and we return the singular form
+    for the given message when count == 1.
+    """
     translation = get_translation()
     if plural_message:
         assert count

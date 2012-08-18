@@ -16,6 +16,7 @@ class LocaleTestCase(unittest.TestCase):
             assert translate('hello') == 'hello'
             assert translate('a', 'b', 1) == 'a'
             assert translate('a', 'b', 2) == 'b'
+            assert translate('%s') % 'hi' == 'hi'
 
     def test_translate(self):
         app = Flask(__name__)
@@ -40,7 +41,7 @@ class LocaleTestCase(unittest.TestCase):
 
         the_locale = 'en'
         with app.test_request_context():
-            assert translate('I love you') == to_unicode('I love you')
+            assert translate('I love you') == 'I love you'
 
         the_locale = 'es_LA'
         with app.test_request_context():
