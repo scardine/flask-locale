@@ -184,7 +184,7 @@ def refresh():
 
         user.locale = request.form['locale']
         refresh()
-        flash(gettext('Language was changed'))
+        flash(translate('Language was changed'))
 
     Without that refresh, the :func:`~flask.flash` function would probably
     return English text and a now German page.
