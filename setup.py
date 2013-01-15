@@ -8,7 +8,7 @@ setup(
     author='whtsky',
     author_email='whtsky@me.com',
     description='i18n and l10n support for Flask',
-    long_description=open('/README.rst', 'r').read(),
+    long_description=open('./README.rst', 'r').read(),
     py_modules=['flask_locale'],
     zip_safe=False,
     platforms='any',
